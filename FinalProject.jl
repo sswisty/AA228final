@@ -17,13 +17,13 @@ using DifferentialEquations
 include("OrbitMechFcns.jl")
 
 # Defining the POMDP
-struct SatPOMDP <: POMDP{float64,float64,float64} # The three inputs are for state, action, observation, all floats
+struct SatPOMDP <: POMDP{Float64,Float64,Float64} # The three inputs are for state, action, observation, all floats
     r_close::Float64 # = -100      # 1/r^2 reward coefficient
     r_burn::Float64 # = -10        # burn reward, multiple for multiple directions?
-    γ::Float64 = # .9              # Discount factor, necessary?
-    μ::Float64 = # 398600.441      #
-    Rₑ::Float64 = # 6378.137       # [km] Earth radius
-    J₂::Float64 = # 1.0826267e-3   # Oblatness
+    γ::Float64  # .9              # Discount factor, necessary?
+    μ::Float64  # 398600.441      #
+    Rₑ::Float64  # 6378.137       # [km] Earth radius
+    J₂::Float64  # 1.0826267e-3   # Oblatness
     dt::Float64
 end
 
@@ -38,16 +38,16 @@ function POMDPs.generate_sor(P::SatPOMDP, s, a) # s,a are arrays...
     IC1 = s[1:6]  # Position and Velocity of satellite
     IC2 = s[7:12] # Position and Velocity of debris
     prob1 = ODEProblem(GravitationalForce,IC1,tspan,params)
-    prob2 = ODEProblem(GravitationalForce,IC1,tspan,params)
-    sol1 = DifferentialEquations.solve(prob1,saveat = dt) # hope this is right ...
-    sol2 = DifferentialEquations.solve(prob2,saveat = dt)
+    prob2 = ODEProblem(GravitationalForce,IC2,tspan,params)
+    sol1 = DifferentialEquations.solve(prob1,saveat = P.dt) # hope this is right ...
+    sol2 = DifferentialEquations.solve(prob2,saveat = P.dt)
 
     # Build the next state vector
-    sp = [sol1.u[end] sol2.u[end]] # make sure this pulls out all the right values
+    sp = [sol1.u[end]' sol2.u[end]'] # transpose keeps sp a row vector...
 
     # Define the reward
-    r = abs(sp[1:3]-sp[7:9]) # probably an array size issue here
-    Rclose = P.r_close*1/r^2
+    r = norm(sp[1:3]-sp[7:9])
+    Rclose = P.r_close*1/r^2 # maybe make this zero if below a threshold ...
     Rburn = P.r_burn*abs(a)   # if just tangential burns are possible, may redefine later
 
     R = Rclose + Rburn
@@ -58,3 +58,57 @@ function POMDPs.generate_sor(P::SatPOMDP, s, a) # s,a are arrays...
 
     return sp,R,o
 end
+
+
+# Test to see if anything happens...
+Rₑ = 6378.137
+# Define the orbital elements of the satellite
+a = Rₑ+500          # 500 km altitude orbit
+e = 0.0             #  circular orbit
+i = deg2rad(90)     #  polar orbit
+Ω = deg2rad(90)
+ω = 0
+ν = 0
+oe_sat = OrbitalElementVec(a,e,i,Ω,ω,ν)
+Rs,Vs = OE2ECI(oe_sat)
+
+# Define the orbital elements of the debris
+a = Rₑ+500          # 500 km altitude orbit
+e = 0.0             #  circular orbit
+i = deg2rad(90)     #  polar orbit
+Ω = deg2rad(0)
+ω = 0
+ν = 0
+oe_deb = OrbitalElementVec(a,e,i,Ω,ω,ν)
+Rd,Vd = OE2ECI(oe_deb)
+
+s = [Rs' Vs' Rd' Vd'] # forcing this a row vector. Should we use a column? Julia defaults to columns
+
+test_s,test_r,test_o = POMDPs.generate_sor(satPOMDP,s,0)
+
+
+#=
+# Test outside of the loop so I can see what is going on
+tspan = (0,satPOMDP.dt)
+params = [satPOMDP.μ,satPOMDP.Rₑ,satPOMDP.J₂]
+
+# Set up as 2 solutions - sat and debris
+IC1 = s[1:6]  # Position and Velocity of satellite
+IC2 = s[7:12] # Position and Velocity of debris
+prob1 = ODEProblem(GravitationalForce,IC1,tspan,params)
+prob2 = ODEProblem(GravitationalForce,IC2,tspan,params)
+sol1 = DifferentialEquations.solve(prob1,saveat = satPOMDP.dt) # hope this is right ...
+sol2 = DifferentialEquations.solve(prob2,saveat = satPOMDP.dt)
+
+sp = [sol1.u[end]' sol2.u[end]']
+
+r = norm(sp[1:3]-sp[7:9])
+
+Rclose = satPOMDP.r_close*1/r^2
+Rburn = satPOMDP.r_burn*abs(0)   # if just tangential burns are possible, may redefine later
+
+R = Rclose + Rburn
+
+# OBSERVATION ...
+o = sp
+=#
