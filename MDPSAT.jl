@@ -23,9 +23,9 @@ Rs,Vs = OE2ECI(oe_sat)
 a = Rₑ+500          # 500 km altitude orbit
 e = 0.0             #  circular orbit
 i = deg2rad(90)     #  polar orbit
-Ω = deg2rad(0)
+Ω = deg2rad(90)
 ω = 0
-ν = 0
+ν = deg2rad(0.1)
 oe_deb = OrbitalElementVec(a,e,i,Ω,ω,ν)
 Rd,Vd = OE2ECI(oe_deb)
 
@@ -51,7 +51,19 @@ function POMDPs.generate_sr(P::SatMDP, s::Array{Float64,1}, a::Float64, rng::Abs
     params = [P.μ, P.Rₑ, P.J₂]
 
     # Set up as 2 solutions - sat and debris
-    IC1 = s[1:6]  # Position and Velocity of satellite
+
+    # Rotate the action (Δv) from RTN frame into ECI frame for propagator
+    r = s[1:3]
+    r̂ = normalize!(r) # Apparently this stores over r
+    v = s[4:6]
+    h = cross(r,v)
+    n̂ = normalize!(h)
+    t̂ = normalize!(cross(n̂,r̂))
+
+    RotMat = [r̂ t̂ n̂]
+    Δv = RotMat*[0;a/1000;0]
+
+    IC1 = [s[1:3]; v+Δv]  # Position and Velocity of satellite
     IC2 = s[7:12] # Position and Velocity of debris
     prob1 = ODEProblem(GravitationalForce, IC1, tspan, params)
     prob2 = ODEProblem(GravitationalForce, IC2, tspan, params)
@@ -76,7 +88,7 @@ end
 # POMDPs.initialstate_distribution(p::SatMDP) = s
 # satPOMDP = SatPOMDP(-100,-10,.9,398600.441,6378.137,1.0826267e-3,1)
 
-mdp = SatMDP(-100, -10, 0.9, 398600.441, 6378.137, 1.0826267e-3, 1) # initializes the MDP
+mdp = SatMDP(-1000, -10, 0.9, 398600.441, 6378.137, 1.0826267e-3, 1) # initializes the MDP
 solver = MCTS.DPWSolver(n_iterations=50, depth=20, exploration_constant=5.0) # initializes the Solver type
 policy = POMDPs.solve(solver, mdp) # initializes the planner
 
@@ -91,8 +103,14 @@ policy = POMDPs.solve(solver, mdp) # initializes the planner
 # simulate(simulator::Simulator, problem::MDP{S,A}, policy::Policy, initial_state::S)
 rsat = []
 rdeb =[]
-for (s, a, r) in stepthrough(mdp, policy, initialState, "s,a,r", max_steps=5)
-    @show a, r, s
+approach = []
+action_taken = []
+reward_recieved = []
+for (s, a, r) in stepthrough(mdp, policy, initialState, "s,a,r", max_steps=100)
+    # @show a, r, s
     push!(rsat,s[1:3])
     push!(rdeb,s[7:9])
+    push!(approach,norm(s[1:3]-s[7:9]))
+    push!(action_taken,a)
+    push!(reward_recieved,r)
 end
