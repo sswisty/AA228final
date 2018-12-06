@@ -61,7 +61,7 @@ function POMDPs.generate_sr(P::SatMDP, s::Array{Float64,1}, a::Float64, rng::Abs
     t̂ = normalize!(cross(n̂,r̂))
 
     RotMat = [r̂ t̂ n̂]
-    Δv = RotMat*[0;a/1000;0]
+    Δv = RotMat*[0;a/10;0]
 
     IC1 = [s[1:3]; v+Δv]  # Position and Velocity of satellite
     IC2 = s[7:12] # Position and Velocity of debris
@@ -75,7 +75,18 @@ function POMDPs.generate_sr(P::SatMDP, s::Array{Float64,1}, a::Float64, rng::Abs
 
     # Define the reward
     r = norm(sp[1:3] - sp[7:9])
-    Rclose = P.r_close*1/r^2 # maybe make this zero if below a threshold ...
+    if r > 20
+        Rclose = 0
+    elseif r < 20 && r > 10
+        Rclose = .5*P.r_close
+    elseif r <10 && r > 5
+        Rclose = P.r_close
+    elseif r < 5 && r > 1
+        Rclose = 2*P.r_close
+    elseif r < 1
+        Rclose = 5*P.r_close
+    end
+    # Rclose = P.r_close*1/r^2 # maybe make this zero if below a threshold ...
     Rburn = P.r_burn*abs(a)   # if just tangential burns are possible, may redefine later
 
     R = Rclose + Rburn
@@ -89,7 +100,8 @@ end
 # satPOMDP = SatPOMDP(-100,-10,.9,398600.441,6378.137,1.0826267e-3,1)
 
 mdp = SatMDP(-1000, -10, 0.9, 398600.441, 6378.137, 1.0826267e-3, 1) # initializes the MDP
-solver = MCTS.DPWSolver(n_iterations=50, depth=20, exploration_constant=5.0) # initializes the Solver type
+solver = MCTS.DPWSolver(n_iterations=50, depth=20, exploration_constant=0.0) # initializes the Solver type
+solver = MCTS.MCTSSolver(exploration_constant=0.0)
 policy = POMDPs.solve(solver, mdp) # initializes the planner
 
 # for (s,a,r) in stepthrough(mdp, planner, "s,a,r", max_steps = 10)
@@ -106,7 +118,7 @@ rdeb =[]
 approach = []
 action_taken = []
 reward_recieved = []
-for (s, a, r) in stepthrough(mdp, policy, initialState, "s,a,r", max_steps=100)
+for (s, a, r) in stepthrough(mdp, policy, initialState, "s,a,r", max_steps=90*60)
     # @show a, r, s
     push!(rsat,s[1:3])
     push!(rdeb,s[7:9])
@@ -114,3 +126,20 @@ for (s, a, r) in stepthrough(mdp, policy, initialState, "s,a,r", max_steps=100)
     push!(action_taken,a)
     push!(reward_recieved,r)
 end
+
+plot(approach)
+xsat = [];ysat = [];zsat = []
+for vect in rsat
+    push!(xsat,vect[1])
+    push!(ysat,vect[2])
+    push!(zsat,vect[3])
+end
+xdeb = [];ydeb = [];zdeb = []
+for vect in rdeb
+    push!(xdeb,vect[1])
+    push!(ydeb,vect[2])
+    push!(zdeb,vect[3])
+end
+
+plot(xsat,ysat,zsat)
+plot!(xdeb,ydeb,zdeb)
