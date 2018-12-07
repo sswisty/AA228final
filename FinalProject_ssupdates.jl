@@ -18,7 +18,7 @@ using Random
 include("OrbitMechFcns.jl")
 
 # Defining the POMDP
-struct SatPOMDP <: POMDP{Float64,Float64,Float64} # The three inputs are for state, action, observation, all floats
+struct SatPOMDP <: POMDP{Array{Float64,1},Float64,Array{Float64,1}} # The three inputs are for state, action, observation, all floats
     r_close::Float64 # = -100      # 1/r^2 reward coefficient
     r_burn::Float64 # = -10        # burn reward, multiple for multiple directions?
     discount::Float64  # .9              # Discount factor, necessary?
@@ -88,21 +88,6 @@ s = [Rs; Vs; Rd; Vd] # forcing this a row vector. Should we use a column? Julia 
 test_s,test_o,test_r = POMDPs.generate_sor(satPOMDP,s,0.0,Random.seed!(1))
 
 
-using POMDPSimulators
-using POMDPPolicies
-POMDPs.initialstate_distribution(p::SatPOMDP) = s
-# policy = FunctionPolicy(o->0.0)
-planner = POMDPs.solve(solver, satPOMDP)
-
-for (s, a, r) in stepthrough(satPOMDP, planner, "s,a,r", max_steps=10)
-    @show s
-    @show a
-    @show r
-    println()
-end
-
-
-
 using POMCPOW
 using POMDPModels
 using POMDPSimulators
@@ -112,6 +97,14 @@ POMDPs.discount(p::SatPOMDP) = 1
 POMDPs.action(p::SatPOMDP) = [-2 -1 0 1 2]
 solver = POMCPOWSolver(criterion=MaxUCB(20.0))
 planner = POMDPs.solve(solver, satPOMDP)
+
+for (s, a, r) in stepthrough(satPOMDP, planner, "s,a,r", max_steps=10)
+    @show s
+    @show a
+    @show r
+    println()
+end
+
 # hr = HistoryRecorder(max_steps=100)
 # hist = simulate(hr, satPOMDP, planner)
 # for (s, b, a, r, sp, o) in hist
