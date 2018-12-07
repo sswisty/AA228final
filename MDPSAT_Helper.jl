@@ -51,3 +51,22 @@ function rewardModel(s, a, mdp::SATMDP)
     r = rProximity + rBurn
 return r
 end
+
+function selectAction(s, d, mdp::SATMDP)
+    if d == 0
+        return 0.0, 0.0
+    end
+    astar = 0;
+    vstar = -1e10
+    for a in mdp.A
+        v = rewardModel(s, a, mdp)
+        sp = simulateDynamics(s, a, mdp)
+        aprime, vprime = selectAction(sp, d - 1, mdp)
+        v += mdp.discount * vprime
+        if v > vstar
+            vstar = v
+            astar = a
+        end
+    end
+return astar, vstar
+end
