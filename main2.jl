@@ -19,7 +19,7 @@ s0 = initState(oe_sat, oe_deb)
 
 ## Parameters
 # Action space in m/s
-A = [-10.0, 0.0, 10.0]
+A = [-20.0, -10.0, 0.0, 10.0, 20.0]
 # MDP fields
 proximityCost = -10
 burnCost = -1
@@ -28,7 +28,7 @@ J₂ = 0
 δt = 1
 mdp = SATMDP(proximityCost, burnCost, Rₑ, μ, J₂, γ, A, δt)
 # Forward Search parameters
-depth = 10
+depth = 5
 steps = 20
 
 ## Run algorithim
