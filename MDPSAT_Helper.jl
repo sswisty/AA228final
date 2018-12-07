@@ -4,6 +4,8 @@ struct SATMDP
     Rₑ::Float64
     μ::Float64
     J₂::Float64
+    discount::Float64
+    A::Array{Float64,1}
     dt::Float64
 end
 
