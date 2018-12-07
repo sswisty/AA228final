@@ -25,20 +25,6 @@ A = [-10.0, 0.0, 10.0]
 s0 = initState(oe_sat, oe_deb)
 mdp = SATMDP(-10, -1, Rₑ, μ, 0, 0.9, A, 1)
 depth = 10
+steps = 10
 
-action_taken = []
-relDist = []
-si = []
-rewards = []
-push!(relDist, norm(s0[1:3] - s0[7:9]))
-push!(si, s0)
-
-for i = 1:7
-    a, v = selectAction(si[i], depth,mdp)
-    sp = simulateDynamics(si[i], a, mdp)
-    rew = rewardModel(si[i], a, mdp)
-    push!(action_taken, a)
-    push!(relDist, norm(sp[1:3] - sp[7:9]))
-    push!(rewards, rew)
-    push!(si, sp)
-end
+sVec, rewards, actions = forwardSearch(mdp, depth, steps, s0)

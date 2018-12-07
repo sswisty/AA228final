@@ -70,3 +70,22 @@ function selectAction(s, d, mdp::SATMDP)
     end
 return astar, vstar
 end
+
+function forwardSearch(mdp::SATMDP, depth, steps, s0)
+    actions = []
+    relDist = []
+    stateVec = []
+    rewards = []
+    push!(relDist, norm(s0[1:3] - s0[7:9]))
+    push!(stateVec, s0)
+    for i = 1 : steps
+        a, v = selectAction(stateVec[i], depth, mdp)
+        sp = simulateDynamics(stateVec[i], a, mdp)
+        r = rewardModel(stateVec[i], a, mdp)
+        push!(actions, a)
+        push!(relDist, norm(sp[1:3] - sp[7:9]))
+        push!(rewards, r)
+        push!(stateVec, sp)
+    end
+    return stateVec, rewards, actions, relDist
+end
